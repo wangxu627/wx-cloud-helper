@@ -5,6 +5,7 @@ import os
 import math
 import sys
 import copy
+import datetime
 import requests
 
 class WXDatabaseHelper:
@@ -144,7 +145,7 @@ class WXDatabaseHelper:
         prefix = "db.collection('" + collection_name + "').where("
         middle = ")"
         suffix = ".get()"
-        query = prefix + self.encode_str(condition) + middle + suffix
+        query = prefix + self._encode_str(condition) + middle + suffix
         data = {
             "env": self.server_env,
             "file_path": file_path,
@@ -195,7 +196,8 @@ class WXDatabaseHelper:
     def add_document(self, collection_name, document):
         prefix = "db.collection('" + collection_name + "').add({data:"
         suffix = "})"
-        query = prefix + self.encode_str(document) + suffix
+        query = prefix + self._encode_str(document) + suffix
+        # print(query)
         url = self.ADD_DOCUMENT_API + "ACCESS_TOKEN=" + self.access_token
         return self._document_action(query, url)
 
@@ -203,32 +205,52 @@ class WXDatabaseHelper:
         prefix = "db.collection('" + collection_name + "').where("
         middle = ").update({data:"
         suffix = "})"
-        query = prefix + self.encode_str(condition) + middle + self.encode_str(document) + suffix
+        query = prefix + self._encode_str(condition) + middle + self._encode_str(document) + suffix
         url = self.UPDATE_DOCUMENT_API + "ACCESS_TOKEN=" + self.access_token
         return self._document_action(query, url)
 
-    def delete_document(self, collection_name, condition):
+    def delete_document(self, collection_name, condition = None):
         prefix = "db.collection('" + collection_name + "').where("
         suffix = ").remove()"
-        query = prefix + self.encode_str(condition) + suffix
+        if(condition):
+            middle = self._encode_str(condition)
+        else:
+            middle = '{_id: _.neq("")}'
+        query = prefix + middle + suffix
         url = self.DELETE_DOCUMENT_API + "ACCESS_TOKEN=" + self.access_token
         return self._document_action(query, url)
 
-    def count_document(self, collection_name, condition):
+    def count_document(self, collection_name, condition = None):
         prefix = "db.collection('" + collection_name + "').where("
         suffix = ").count()"
-        query = prefix + self.encode_str(condition) + suffix
+        if(condition):
+            middle = self._encode_str(condition)
+        else:
+            middle = '{_id: _.neq("")}'
+        query = prefix + middle + suffix
         url = self.COUNT_DOCUMENT_API + "ACCESS_TOKEN=" + self.access_token
         return self._document_action(query, url)
 
-    def query_document(self, collection_name, condition, limit = None, skip = None):
+    def query_document(self, collection_name, condition, field = None, orderby = None, limit = None, skip = None):
         prefix = "db.collection('" + collection_name + "').where("
-        middle = ")"
+        middle1 = ")"
+        middle2 = ".field("
+        middle3 = ")"
+
         suffix = ".get()"
+        orderby_q = ".orderBy('" + orderby[0] + "','" + orderby[1] + "')" if orderby else ""
         limit_q = ".limit(" + str(limit) + ")" if limit else ""
         skip_q  = ".skip(" + str(skip) + ")" if skip else "" 
         
-        query = prefix + self.encode_str(condition) + middle + limit_q + skip_q + suffix
+        if(condition):
+            middle = self._encode_str(condition)
+        else:
+            middle = '{_id: _.neq("")}'
+
+        if(field):
+            middle += middle1 + middle2 + self._encode_str(field)
+        query = prefix + middle + middle3 + orderby_q + limit_q + skip_q + suffix
+        print(query)
         url = self.QUERY_DOCUMENT_API + "ACCESS_TOKEN=" + self.access_token
         return self._document_action(query, url)
 
@@ -262,13 +284,13 @@ class WXDatabaseHelper:
             ret_obj = {}
         return ret_obj
 
-    def encode_str(self, value):
+    def _encode_str(self, value):
         if type(value) == dict:
             obj_str = "{"
             for k, v in value.items():
                 obj_str += k
                 obj_str += ":"
-                obj_str += self.encode_str(v)
+                obj_str += self._encode_str(v)
                 obj_str += ","
             obj_str = obj_str[:-1]
             obj_str += "}"
@@ -276,16 +298,26 @@ class WXDatabaseHelper:
         elif type(value) == int:
             return str(value)
         elif type(value) == str:
-            return '"' + value + '"'
+            # value = value.replace('"', '\\"')
+            # value = value.replace('/', '\\/')
+
+            return "'" + value + "'"
         elif type(value) == list:
             obj_str = "["
             for l in value:
-                obj_str += self.encode_str(l)
+                obj_str += self._encode_str(l)
                 obj_str += ","
             obj_str = obj_str[:-1]
             obj_str += "]"
             return obj_str
+        elif type(value) == bool:
+            return "true" if value else "false"
+        elif type(value) == datetime.datetime:
+            return 'new Date("' + value.isoformat() + "Z" + '")'
         else:
-            return ""
+            try:
+                return '"' + str(value) + '"' 
+            except:
+                return '"<<WrongTypeData>>"'
 
 
