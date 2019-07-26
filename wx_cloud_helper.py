@@ -298,9 +298,6 @@ class WXDatabaseHelper:
         elif type(value) == int:
             return str(value)
         elif type(value) == str:
-            # value = value.replace('"', '\\"')
-            # value = value.replace('/', '\\/')
-
             return "'" + value + "'"
         elif type(value) == list:
             obj_str = "["
@@ -316,8 +313,8 @@ class WXDatabaseHelper:
             return 'new Date("' + value.isoformat() + "Z" + '")'
         else:
             try:
-                return '"' + str(value) + '"' 
+                return "'" + str(value) + "'"
             except:
-                return '"<<WrongTypeData>>"'
+                return "'<<WrongTypeData>>'"
 
 
